@@ -1,8 +1,6 @@
 # Clinic SaaS
 
-Demonstração para consultório: agenda, pacientes, pré-atendimento, telemedicina (link WhatsApp), resumo, rascunho de prescrição e exportação CSV.
-
-Pacientes e consultas são fictícios. A organização de texto não diagnostica nem prescreve.
+Demonstração para consultório, sem pacientes prontos: o paciente agenda e faz o pré-atendimento; o profissional entra com o e-mail e a chave. Telemedicina usa o WhatsApp da clínica. A organização de texto não diagnostica nem prescreve.
 
 Tenant ativo: CL001 Clínica Azul. E-mail `sanderolameda@gmail.com`. WhatsApp `+55 19 99368-0549`.
 

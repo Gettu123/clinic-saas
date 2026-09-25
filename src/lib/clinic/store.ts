@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import {
   buildSeed,
   DEFAULT_CONFIGS,
+  makeAccessCode,
   nid,
   type Appointment,
   type ClinicConfig,
@@ -15,9 +16,15 @@ type ClinicState = {
   configs: Record<string, ClinicConfig>;
   patients: Patient[];
   appointments: Appointment[];
+  proEmail: string;
+  proCode: string;
+  proOpen: boolean;
   enter: (tenantId: string) => void;
   leave: () => void;
   saveConfig: (patch: Partial<ClinicConfig>) => void;
+  createProfessional: (email: string) => string;
+  unlockProfessional: (code: string) => boolean;
+  lockProfessional: () => void;
   addPatient: (input: Omit<Patient, "id" | "status">) => string;
   updatePatient: (id: string, patch: Partial<Omit<Patient, "id">>) => void;
   addAppointment: (input: Omit<Appointment, "id" | "documentos" | "notas" | "medicamentoRascunho" | "posologia"> & { documentos?: DocFile[] }) => string;
@@ -25,23 +32,45 @@ type ClinicState = {
   resetDemo: () => void;
 };
 
-const seed = buildSeed();
+const empty = buildSeed();
 
 export const useClinic = create<ClinicState>()(
   persist(
     (set, get) => ({
-      tenantId: null,
+      tenantId: "CL001",
       configs: DEFAULT_CONFIGS,
-      patients: seed.patients,
-      appointments: seed.appointments,
+      patients: empty.patients,
+      appointments: empty.appointments,
+      proEmail: "",
+      proCode: "",
+      proOpen: false,
       enter: (tenantId) => set({ tenantId }),
       leave: () => set({ tenantId: null }),
       saveConfig: (patch) => {
-        const id = get().tenantId;
-        if (!id) return;
+        const id = get().tenantId ?? "CL001";
         const current = get().configs[id] ?? DEFAULT_CONFIGS[id] ?? { email: "", whatsapp: "" };
         set({ configs: { ...get().configs, [id]: { ...current, ...patch } } });
       },
+      createProfessional: (email) => {
+        const code = makeAccessCode();
+        const clean = email.trim().toLowerCase();
+        const id = get().tenantId ?? "CL001";
+        const current = get().configs[id] ?? DEFAULT_CONFIGS[id] ?? { email: "", whatsapp: "" };
+        set({
+          tenantId: id,
+          proEmail: clean,
+          proCode: code,
+          proOpen: false,
+          configs: { ...get().configs, [id]: { ...current, email: clean } },
+        });
+        return code;
+      },
+      unlockProfessional: (code) => {
+        const ok = Boolean(get().proCode) && get().proCode === code.trim();
+        if (ok) set({ proOpen: true, tenantId: get().tenantId ?? "CL001" });
+        return ok;
+      },
+      lockProfessional: () => set({ proOpen: false }),
       addPatient: (input) => {
         const id = nid("P");
         const patient: Patient = { ...input, id, status: "Ativo" };
@@ -70,22 +99,38 @@ export const useClinic = create<ClinicState>()(
           appointments: get().appointments.map((a) => (a.id === id ? { ...a, ...patch } : a)),
         }),
       resetDemo: () => {
-        const next = buildSeed();
         set({
-          patients: next.patients,
-          appointments: next.appointments,
+          patients: [],
+          appointments: [],
           configs: DEFAULT_CONFIGS,
+          proEmail: "",
+          proCode: "",
+          proOpen: false,
+          tenantId: "CL001",
         });
       },
     }),
     {
       name: "clinic-saas-mvp",
+      version: 2,
       skipHydration: true,
+      migrate: () => ({
+        tenantId: "CL001",
+        configs: DEFAULT_CONFIGS,
+        patients: [],
+        appointments: [],
+        proEmail: "",
+        proCode: "",
+        proOpen: false,
+      }),
       partialize: (s) => ({
         tenantId: s.tenantId,
         configs: s.configs,
         patients: s.patients,
         appointments: s.appointments,
+        proEmail: s.proEmail,
+        proCode: s.proCode,
+        proOpen: s.proOpen,
       }),
     },
   ),

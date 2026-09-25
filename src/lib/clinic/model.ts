@@ -68,10 +68,26 @@ export function licenseLabel(estado: TenantRecord["estado"]) {
   return estado === "Activo" ? "Ativo" : "Suspenso";
 }
 
+export const CLINIC_WHATSAPP = "5519993680549";
+
 export const DEFAULT_CONFIGS: Record<string, ClinicConfig> = {
-  CL001: { email: "sanderolameda@gmail.com", whatsapp: "5519993680549" },
+  CL001: { email: "sanderolameda@gmail.com", whatsapp: CLINIC_WHATSAPP },
   CL002: { email: "medico@caribe.example", whatsapp: "5841299999999" },
 };
+
+export function makeAccessCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+export function accessMailLink(email: string, code: string) {
+  const subject = "Chave de acesso — Clinic SaaS";
+  const body = `Sua chave para a área profissional da Clínica Azul é: ${code}\n\nDigite essa chave na aba de usuário. Não compartilhe.`;
+  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+export function documentMailLink(email: string, subject: string, body: string) {
+  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.slice(0, 1800))}`;
+}
 
 export const MED_CATALOG = [
   { nome: "Paracetamol", principio: "paracetamol", forma: "comprimido" },
@@ -286,128 +302,7 @@ export function downloadText(filename: string, text: string) {
 }
 
 export function buildSeed() {
-  const today = todayISO();
-  const tomorrow = addDaysISO(today, 1);
-  const patients: Patient[] = [
-    {
-      id: "P001",
-      nome: "Ana Souza",
-      nascimento: "1989-05-10",
-      telefone: "5511991111111",
-      email: "ana@example.com",
-      status: "Ativo",
-      alergias: "Nenhuma conhecida",
-      consentimentoTelemedicina: true,
-    },
-    {
-      id: "P002",
-      nome: "Carlos Lima",
-      nascimento: "1978-09-22",
-      telefone: "5511992222222",
-      email: "carlos@example.com",
-      status: "Ativo",
-      alergias: "Poeira",
-      consentimentoTelemedicina: false,
-    },
-    {
-      id: "P003",
-      nome: "Beatriz Nogueira",
-      nascimento: "1995-01-14",
-      telefone: "5511993333333",
-      email: "beatriz@example.com",
-      status: "Ativo",
-      alergias: "Penicilina",
-      consentimentoTelemedicina: true,
-    },
-    {
-      id: "P004",
-      nome: "Rafael Costa",
-      nascimento: "1968-11-03",
-      telefone: "5511994444444",
-      email: "rafael@example.com",
-      status: "Ativo",
-      alergias: "Nenhuma conhecida",
-      consentimentoTelemedicina: true,
-    },
-  ];
-  const appointments: Appointment[] = [
-    {
-      id: "A001",
-      patientId: "P001",
-      data: today,
-      hora: "09:00",
-      tipo: "Presencial",
-      status: "Confirmado",
-      sintomas: "Dor de garganta há 2 dias, sem falta de ar.",
-      medicamentos: "Dipirona quando dói",
-      alergias: "Nenhuma conhecida",
-      notas: "",
-      medicamentoRascunho: "",
-      posologia: "",
-      documentos: [],
-    },
-    {
-      id: "A002",
-      patientId: "P002",
-      data: today,
-      hora: "10:00",
-      tipo: "Telemedicina",
-      status: "Pendente",
-      sintomas: "Dor lombar ao sentar por muito tempo.",
-      medicamentos: "Nenhum",
-      alergias: "Poeira",
-      notas: "",
-      medicamentoRascunho: "",
-      posologia: "",
-      documentos: [],
-    },
-    {
-      id: "A003",
-      patientId: "P003",
-      data: today,
-      hora: "11:30",
-      tipo: "Retorno",
-      status: "Confirmado",
-      sintomas: "Retorno para mostrar exames de rotina. Sem queixa nova.",
-      medicamentos: "Nenhum",
-      alergias: "Penicilina",
-      notas: "",
-      medicamentoRascunho: "",
-      posologia: "",
-      documentos: [],
-    },
-    {
-      id: "A004",
-      patientId: "P004",
-      data: today,
-      hora: "14:00",
-      tipo: "Presencial",
-      status: "Pendente",
-      sintomas: "Cansaço e falta de ar ao subir escadas há 1 semana.",
-      medicamentos: "Losartana 50 mg",
-      alergias: "Nenhuma conhecida",
-      notas: "",
-      medicamentoRascunho: "",
-      posologia: "",
-      documentos: [],
-    },
-    {
-      id: "A005",
-      patientId: "P001",
-      data: tomorrow,
-      hora: "15:00",
-      tipo: "Retorno",
-      status: "Pendente",
-      sintomas: "",
-      medicamentos: "",
-      alergias: "Nenhuma conhecida",
-      notas: "",
-      medicamentoRascunho: "",
-      posologia: "",
-      documentos: [],
-    },
-  ];
-  return { patients, appointments };
+  return { patients: [] as Patient[], appointments: [] as Appointment[] };
 }
 
 export function sortBySchedule(list: Appointment[]) {

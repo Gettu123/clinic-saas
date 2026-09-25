@@ -14,16 +14,18 @@ import {
 } from "lucide-react";
 import { useClinic } from "@/lib/clinic/store";
 import {
+  CLINIC_WHATSAPP,
   MED_CATALOG,
   TENANTS,
+  accessMailLink,
   agendaCsv,
   changeMessage,
+  documentMailLink,
   downloadText,
   evaluationText,
   formatISODate,
   formatLongDate,
   formatWa,
-  licenseLabel,
   organizeIntake,
   patientsCsv,
   prescriptionText,
@@ -38,11 +40,11 @@ import {
 } from "@/lib/clinic/model";
 
 type Tab = "agenda" | "patients" | "pre" | "tele" | "admin";
+type Area = "patient" | "account" | "pro";
 
-const TABS: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
+const PRO_TABS: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
   { id: "agenda", label: "Agenda", icon: CalendarDays },
   { id: "patients", label: "Pacientes", icon: Users },
-  { id: "pre", label: "Pré-atendimento", icon: ClipboardPlus },
   { id: "tele", label: "Telemedicina", icon: Video },
   { id: "admin", label: "Configurações", icon: Settings },
 ];
@@ -63,6 +65,9 @@ function tipoClass(tipo: Tipo) {
 export function ClinicApp() {
   const [ready, setReady] = useState(false);
   const tenantId = useClinic((s) => s.tenantId);
+  const proOpen = useClinic((s) => s.proOpen);
+  const [area, setArea] = useState<Area>("patient");
+  const [patientTab, setPatientTab] = useState<"book" | "pre">("book");
   const [tab, setTab] = useState<Tab>("agenda");
   const [agendaDate, setAgendaDate] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -72,6 +77,7 @@ export function ClinicApp() {
   useEffect(() => {
     const finish = () => {
       setAgendaDate((current) => current || todayISO());
+      if (!useClinic.getState().tenantId) useClinic.getState().enter("CL001");
       setReady(true);
     };
     const unsub = useClinic.persist.onFinishHydration(finish);
@@ -94,11 +100,8 @@ export function ClinicApp() {
     );
   }
 
-  if (!tenantId) {
-    return <Login />;
-  }
-
-  const tenant = TENANTS.find((t) => t.tenant_id === tenantId) ?? TENANTS[0];
+  const tenant = TENANTS.find((t) => t.tenant_id === (tenantId ?? "CL001")) ?? TENANTS[0];
+  const proEmail = useClinic.getState().proEmail;
 
   return (
     <div className="min-h-screen">
@@ -115,38 +118,71 @@ export function ClinicApp() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="chip hidden bg-brand-soft text-brand sm:inline-flex">{tenant.plan}</span>
-          <button className="btn btn-ghost" type="button" onClick={() => useClinic.getState().leave()}>
-            <LogOut className="size-4" aria-hidden="true" />
-            Sair
-          </button>
+          {area === "pro" ? (
+            <button className="btn btn-ghost" type="button" onClick={() => setArea("patient")}>
+              Área do paciente
+            </button>
+          ) : (
+            <button className="btn btn-ghost" type="button" onClick={() => setArea("account")}>
+              <Settings className="size-4" aria-hidden="true" />
+              Área profissional
+            </button>
+          )}
+          {area === "pro" ? (
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => {
+                useClinic.getState().lockProfessional();
+                setArea("patient");
+              }}
+            >
+              <LogOut className="size-4" aria-hidden="true" />
+              Sair
+            </button>
+          ) : null}
         </div>
       </header>
 
       <nav className="sticky top-0 z-10 border-b border-line bg-bg/95 backdrop-blur" aria-label="Seções">
         <div className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-3 py-2">
-          {TABS.map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={`btn shrink-0 ${active ? "btn-primary" : "btn-ghost"}`}
-                aria-current={active ? "page" : undefined}
-                onClick={() => setTab(item.id)}
-              >
-                <Icon className="size-4" aria-hidden="true" />
-                {item.label}
-              </button>
-            );
-          })}
+          {area === "pro" && proOpen
+            ? PRO_TABS.map((item) => {
+                const Icon = item.icon;
+                const active = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`btn shrink-0 ${active ? "btn-primary" : "btn-ghost"}`}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => setTab(item.id)}
+                  >
+                    <Icon className="size-4" aria-hidden="true" />
+                    {item.label}
+                  </button>
+                );
+              })
+            : area === "patient"
+              ? (["book", "pre"] as const).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`btn shrink-0 ${patientTab === id ? "btn-primary" : "btn-ghost"}`}
+                    aria-current={patientTab === id ? "page" : undefined}
+                    onClick={() => setPatientTab(id)}
+                  >
+                    {id === "book" ? <CalendarDays className="size-4" aria-hidden="true" /> : <ClipboardPlus className="size-4" aria-hidden="true" />}
+                    {id === "book" ? "Agendamento" : "Pré-atendimento"}
+                  </button>
+                ))
+              : null}
         </div>
       </nav>
 
       <main className="mx-auto w-full max-w-6xl px-4 py-5 pb-16">
         <p className="mb-4 text-sm text-muted">
-          Ambiente de demonstração com pacientes fictícios. A organização de texto não diagnostica, não prescreve e não substitui o médico.
+          Demonstração vazia para o comprador testar. A organização de texto não diagnostica, não prescreve e não substitui o médico.
         </p>
         {notice ? (
           <p role="status" className="mb-4 rounded-xl border border-teal bg-teal-soft px-4 py-3 text-sm text-ink">
@@ -154,7 +190,19 @@ export function ClinicApp() {
           </p>
         ) : null}
 
-        {tab === "agenda" ? (
+        {area === "account" ? (
+          <AccountGate
+            onBack={() => setArea("patient")}
+            onEnter={() => {
+              setArea("pro");
+              setTab("agenda");
+            }}
+          />
+        ) : null}
+        {area === "patient" && patientTab === "book" ? <Book setNotice={setNotice} /> : null}
+        {area === "patient" && patientTab === "pre" ? <Intake setNotice={setNotice} initialPatientId="" /> : null}
+
+        {area === "pro" && proOpen && tab === "agenda" ? (
           <Agenda
             date={agendaDate}
             setDate={setAgendaDate}
@@ -162,10 +210,9 @@ export function ClinicApp() {
             setSelectedId={setSelectedId}
             setNotice={setNotice}
             setPreview={setPreview}
-            setTab={setTab}
           />
         ) : null}
-        {tab === "patients" ? (
+        {area === "pro" && proOpen && tab === "patients" ? (
           <Patients
             setNotice={setNotice}
             onOpen={(id, date) => {
@@ -175,24 +222,30 @@ export function ClinicApp() {
             }}
           />
         ) : null}
-        {tab === "pre" ? <Intake setNotice={setNotice} initialPatientId={patientIdOf(selectedId)} /> : null}
-        {tab === "tele" ? (
+        {area === "pro" && proOpen && tab === "tele" ? (
           <Tele selectedId={selectedId} setSelectedId={setSelectedId} setNotice={setNotice} setPreview={setPreview} />
         ) : null}
-        {tab === "admin" ? <Admin setNotice={setNotice} /> : null}
+        {area === "pro" && proOpen && tab === "admin" ? <Admin setNotice={setNotice} /> : null}
 
-        {preview ? (
+        {preview && area === "pro" ? (
           <article className="panel mt-4 p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl">{preview.title}</h2>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => downloadText(`${preview.title.toLowerCase().replaceAll(" ", "-")}.txt`, preview.body)}
-              >
-                <Download className="size-4" aria-hidden="true" />
-                Baixar .txt
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => downloadText(`${preview.title.toLowerCase().replaceAll(" ", "-")}.txt`, preview.body)}
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Baixar .txt
+                </button>
+                {proEmail ? (
+                  <a className="btn btn-accent" href={documentMailLink(proEmail, preview.title, preview.body)}>
+                    Enviar ao e-mail
+                  </a>
+                ) : null}
+              </div>
             </div>
             <pre className="max-h-96 overflow-auto rounded-xl bg-bg p-4 text-sm whitespace-pre-wrap text-ink">{preview.body}</pre>
           </article>
@@ -202,54 +255,194 @@ export function ClinicApp() {
   );
 }
 
-function patientIdOf(appointmentId: string | null) {
-  if (!appointmentId) return "";
-  return useClinic.getState().appointments.find((a) => a.id === appointmentId)?.patientId ?? "";
-}
-
-function Login() {
-  const [tenantId, setTenantId] = useState("CL001");
+function AccountGate({ onBack, onEnter }: { onBack: () => void; onEnter: () => void }) {
+  const proEmail = useClinic((s) => s.proEmail);
+  const proOpen = useClinic((s) => s.proOpen);
+  const createProfessional = useClinic((s) => s.createProfessional);
+  const unlockProfessional = useClinic((s) => s.unlockProfessional);
+  const [email, setEmail] = useState(proEmail || "sanderolameda@gmail.com");
+  const [typed, setTyped] = useState("");
+  const [issued, setIssued] = useState("");
   const [error, setError] = useState("");
 
   return (
-    <main className="grid min-h-screen place-items-center px-4 py-10">
-      <section className="panel w-full max-w-md p-7">
-        <span className="mb-4 grid size-12 place-items-center rounded-xl bg-brand text-on-brand" aria-hidden="true">
-          <svg viewBox="0 0 24 24" className="size-7">
-            <path fill="currentColor" d="M10 4h4v16h-4zM4 10h16v4H4z" />
-          </svg>
-        </span>
-        <p className="text-xs font-semibold tracking-widest text-accent uppercase">Clinic SaaS · white-label</p>
-        <h1 className="mt-1 text-3xl">Portal do consultório</h1>
-        <p className="mt-2 text-sm text-muted">Escolha a clínica de demonstração. Dados fictícios, sem pacientes reais.</p>
-        <label className="mt-5 block text-sm font-semibold" htmlFor="tenant">
-          Clínica
-          <select id="tenant" className="field" value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
-            {TENANTS.map((t) => (
-              <option key={t.tenant_id} value={t.tenant_id}>
-                {t.nombre_comercio} — {licenseLabel(t.estado)}
-              </option>
-            ))}
+    <section className="panel mx-auto max-w-lg p-6">
+      <p className="text-xs font-semibold tracking-widest text-accent uppercase">Usuário</p>
+      <h2 className="text-2xl">Acesso profissional</h2>
+      <p className="mt-2 text-sm text-muted">
+        Crie o usuário com o e-mail que vai receber a chave, as receitas e os CSV. Depois digite a chave para abrir agenda, pacientes, telemedicina e configurações.
+      </p>
+      <form
+        className="mt-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const clean = email.trim().toLowerCase();
+          if (!clean.includes("@")) {
+            setError("Informe um e-mail válido.");
+            return;
+          }
+          const code = createProfessional(clean);
+          setIssued(code);
+          setError("");
+          setTyped("");
+          window.open(accessMailLink(clean, code), "_blank", "noopener,noreferrer");
+        }}
+      >
+        <label className="block text-sm font-semibold" htmlFor="proEmail">
+          E-mail do profissional
+          <input id="proEmail" className="field" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <button className="btn btn-primary mt-3" type="submit">
+          Criar usuário e enviar chave
+        </button>
+      </form>
+      {issued ? (
+        <div className="mt-4 rounded-xl border border-teal bg-teal-soft p-4 text-sm">
+          <p>
+            A mensagem com a chave foi aberta para <strong>{email}</strong>. Envie esse e-mail para recebê-la.
+          </p>
+          <p className="mt-2">
+            Nesta demonstração, sem servidor de e-mail, a chave também aparece aqui: <strong>{issued}</strong>
+          </p>
+          <a className="mt-2 inline-block text-brand underline" href={accessMailLink(email, issued)}>
+            Abrir o e-mail de novo
+          </a>
+        </div>
+      ) : null}
+      <form
+        className="mt-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!unlockProfessional(typed)) {
+            setError("Chave incorreta.");
+            return;
+          }
+          setError("");
+          onEnter();
+        }}
+      >
+        <label className="block text-sm font-semibold" htmlFor="proCode">
+          Chave recebida no e-mail
+          <input id="proCode" className="field" inputMode="numeric" autoComplete="one-time-code" value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </label>
+        <button className="btn btn-ok mt-3" type="submit">
+          Entrar na área profissional
+        </button>
+      </form>
+      {error ? <p className="mt-3 text-sm text-alert">{error}</p> : null}
+      {proOpen ? (
+        <button className="btn btn-primary mt-3" type="button" onClick={onEnter}>
+          Continuar
+        </button>
+      ) : null}
+      <p className="mt-4 text-sm text-muted">
+        Dois médicos em celulares diferentes não veem a mesma agenda: cada navegador guarda só o que foi criado nele. Para cada e-mail ter os seus pacientes, a chave chegar sozinha e os arquivos irem ao e-mail, é preciso ligar um banco (Firebase) à conta.
+      </p>
+      <button className="btn btn-ghost mt-3" type="button" onClick={onBack}>
+        Voltar ao agendamento
+      </button>
+    </section>
+  );
+}
+
+function Book({ setNotice }: { setNotice: (s: string) => void }) {
+  const patients = useClinic((s) => s.patients);
+  const appointments = useClinic((s) => s.appointments);
+  const addPatient = useClinic((s) => s.addPatient);
+  const addAppointment = useClinic((s) => s.addAppointment);
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
+  const [data, setData] = useState(todayISO());
+  const [hora, setHora] = useState("09:00");
+  const [tipo, setTipo] = useState<Tipo>("Presencial");
+
+  const upcoming = sortBySchedule(appointments.filter((a) => a.status !== "Cancelado")).slice(0, 8);
+
+  return (
+    <section className="panel mx-auto max-w-3xl p-5">
+      <p className="text-xs font-semibold tracking-widest text-accent uppercase">Paciente</p>
+      <h2 className="text-2xl">Agendar consulta</h2>
+      <p className="mt-1 text-sm text-muted">Primeira tela da clínica. Escolha consulta, retorno ou telemedicina.</p>
+      <form
+        className="mt-4 grid gap-3 sm:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const digits = telefone.replace(/\D/g, "");
+          const existing = patients.find((p) => digits && p.telefone.replace(/\D/g, "") === digits);
+          const patientId =
+            existing?.id ??
+            addPatient({
+              nome: nome.trim(),
+              nascimento: "",
+              telefone: digits || telefone.trim(),
+              email: email.trim(),
+              alergias: "",
+              consentimentoTelemedicina: true,
+            });
+          addAppointment({
+            patientId,
+            data,
+            hora,
+            tipo,
+            status: "Pendente",
+            sintomas: "",
+            medicamentos: "",
+            alergias: existing?.alergias ?? "",
+          });
+          setNotice("Pedido de horário registrado. A clínica confirma na agenda.");
+          setNome("");
+          setTelefone("");
+          setEmail("");
+        }}
+      >
+        <label className="text-sm font-semibold sm:col-span-2">
+          Nome
+          <input className="field" required value={nome} onChange={(e) => setNome(e.target.value)} />
+        </label>
+        <label className="text-sm font-semibold">
+          WhatsApp
+          <input className="field" required value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="11999999999" />
+        </label>
+        <label className="text-sm font-semibold">
+          E-mail
+          <input className="field" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label className="text-sm font-semibold">
+          Data
+          <input className="field" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+        </label>
+        <label className="text-sm font-semibold">
+          Hora
+          <input className="field" type="time" required value={hora} onChange={(e) => setHora(e.target.value)} />
+        </label>
+        <label className="text-sm font-semibold sm:col-span-2">
+          Tipo
+          <select className="field" value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)}>
+            <option>Presencial</option>
+            <option>Retorno</option>
+            <option>Telemedicina</option>
           </select>
         </label>
-        <button
-          className="btn btn-primary mt-4 w-full"
-          type="button"
-          onClick={() => {
-            const tenant = TENANTS.find((t) => t.tenant_id === tenantId);
-            if (!tenant || tenant.estado !== "Activo") {
-              setError("Licença suspensa. Acesso administrativo necessário.");
-              return;
-            }
-            setError("");
-            useClinic.getState().enter(tenant.tenant_id);
-          }}
-        >
-          Entrar
+        <button className="btn btn-primary sm:col-span-2" type="submit">
+          Pedir horário
         </button>
-        {error ? <p className="mt-3 text-sm text-alert">{error}</p> : null}
-      </section>
-    </main>
+      </form>
+      {upcoming.length ? (
+        <ul className="mt-5 space-y-2">
+          {upcoming.map((a) => {
+            const p = patients.find((x) => x.id === a.patientId);
+            return (
+              <li key={a.id} className="rounded-xl border border-line px-3 py-2 text-sm">
+                {formatISODate(a.data)} · {a.hora} · {p?.nome ?? "Paciente"} · {a.tipo} · {a.status}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-4 text-sm text-muted">Nenhum horário pedido ainda.</p>
+      )}
+    </section>
   );
 }
 
@@ -260,7 +453,6 @@ function Agenda({
   setSelectedId,
   setNotice,
   setPreview,
-  setTab,
 }: {
   date: string;
   setDate: (d: string) => void;
@@ -268,7 +460,6 @@ function Agenda({
   setSelectedId: (id: string) => void;
   setNotice: (s: string) => void;
   setPreview: (p: { title: string; body: string } | null) => void;
-  setTab: (t: Tab) => void;
 }) {
   const appointments = useClinic((s) => s.appointments);
   const patients = useClinic((s) => s.patients);
@@ -426,12 +617,7 @@ function Agenda({
         </div>
       </section>
 
-      <MedicalCard
-        appointment={selected}
-        setNotice={setNotice}
-        setPreview={setPreview}
-        onIntake={() => setTab("pre")}
-      />
+      <MedicalCard appointment={selected} setNotice={setNotice} setPreview={setPreview} />
     </div>
   );
 }
@@ -476,7 +662,7 @@ function MedicalCard({
   const patient = patients.find((p) => p.id === appointment.patientId);
   if (!patient) return null;
   const brief = organizeIntake(appointment.sintomas, appointment.medicamentos, appointment.alergias);
-  const blocked = appointment.tipo === "Telemedicina" && !patient.consentimentoTelemedicina;
+  const whatsapp = (config.whatsapp || CLINIC_WHATSAPP).replace(/\D/g, "") || CLINIC_WHATSAPP;
 
   return (
     <aside className="panel p-5">
@@ -628,24 +814,20 @@ function MedicalCard({
         </button>
       </div>
       <div className="mt-2">
-        {blocked ? (
-          <p className="text-sm text-alert">Paciente sem consentimento para contato de telemedicina.</p>
-        ) : (
-          <a
-            className="btn btn-ok"
-            href={waLink(
-              config.whatsapp,
-              appointment.tipo === "Telemedicina"
-                ? teleMessage(patient)
-                : reminderMessage(patient, appointment.data, appointment.hora, tenant.nombre_comercio),
-            )}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <MessageCircle className="size-4" aria-hidden="true" />
-            WhatsApp
-          </a>
-        )}
+        <a
+          className="btn btn-ok"
+          href={waLink(
+            whatsapp,
+            appointment.tipo === "Telemedicina"
+              ? teleMessage(patient)
+              : reminderMessage(patient, appointment.data, appointment.hora, tenant.nombre_comercio),
+          )}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <MessageCircle className="size-4" aria-hidden="true" />
+          WhatsApp
+        </a>
       </div>
     </aside>
   );
@@ -859,6 +1041,9 @@ function Intake({ setNotice, initialPatientId }: { setNotice: (s: string) => voi
       <p className="text-xs font-semibold tracking-widest text-accent uppercase">Paciente</p>
       <h2 className="text-2xl">Pré-atendimento</h2>
       <p className="mt-1 text-sm text-muted">O texto é só organizado. Nada aqui é diagnóstico ou prescrição.</p>
+      {active.length === 0 ? <p className="mt-4 text-sm text-muted">Ainda não há paciente. Comece pela aba Agendamento.</p> : null}
+      {active.length > 0 ? (
+        <>
       <form
         className="mt-4"
         onSubmit={async (e) => {
@@ -949,6 +1134,8 @@ function Intake({ setNotice, initialPatientId }: { setNotice: (s: string) => voi
           <p className="mt-2 text-sm text-muted">Não é diagnóstico nem triagem médica automática.</p>
         </div>
       ) : null}
+        </>
+      ) : null}
     </section>
   );
 }
@@ -969,7 +1156,8 @@ function Tele({
   const configs = useClinic((s) => s.configs);
   const tenantId = useClinic((s) => s.tenantId);
   const updateAppointment = useClinic((s) => s.updateAppointment);
-  const config = (tenantId && configs[tenantId]) || { email: "", whatsapp: "" };
+  const config = (tenantId && configs[tenantId]) || { email: "", whatsapp: CLINIC_WHATSAPP };
+  const whatsapp = (config.whatsapp || CLINIC_WHATSAPP).replace(/\D/g, "") || CLINIC_WHATSAPP;
   const remote = sortBySchedule(appointments.filter((a) => a.tipo === "Telemedicina" && a.status !== "Cancelado"));
   const selected = remote.find((a) => a.id === selectedId) ?? remote[0] ?? null;
   const patient = patients.find((p) => p.id === selected?.patientId);
@@ -979,9 +1167,16 @@ function Tele({
       <section className="panel p-5 lg:col-span-2">
         <p className="text-xs font-semibold tracking-widest text-accent uppercase">Telemedicina</p>
         <h2 className="text-2xl">Atendimentos remotos</h2>
-        <p className="mt-1 text-sm text-muted">
-          O WhatsApp abre um link wa.me para {formatWa(config.whatsapp)}. A videochamada em si entra em produção.
-        </p>
+        <p className="mt-1 text-sm text-muted">O WhatsApp abre um link wa.me para {formatWa(whatsapp)}.</p>
+        <a
+          className="btn btn-ok mt-4"
+          target="_blank"
+          rel="noreferrer"
+          href={waLink(whatsapp, "Olá, sou paciente da Clínica Azul e quero atendimento por telemedicina.")}
+        >
+          <MessageCircle className="size-4" aria-hidden="true" />
+          Abrir WhatsApp
+        </a>
         {remote.length === 0 ? <p className="mt-4 text-sm text-muted">Nenhuma teleconsulta ativa.</p> : null}
         <ul className="mt-4 space-y-2">
           {remote.map((a) => {
@@ -1021,24 +1216,20 @@ function Tele({
                 onChange={(e) => updateAppointment(selected.id, { hora: e.target.value })}
               />
             </label>
-            {patient.consentimentoTelemedicina ? (
-              <div className="flex flex-wrap gap-2 sm:col-span-2">
-                <a className="btn btn-ok" target="_blank" rel="noreferrer" href={waLink(config.whatsapp, teleMessage(patient))}>
-                  <MessageCircle className="size-4" aria-hidden="true" />
-                  Avisar teleconsulta
-                </a>
-                <a
-                  className="btn btn-ghost"
-                  target="_blank"
-                  rel="noreferrer"
-                  href={waLink(config.whatsapp, changeMessage(patient, selected.data, selected.hora))}
-                >
-                  Avisar alteração
-                </a>
-              </div>
-            ) : (
-              <p className="text-sm text-alert sm:col-span-2">Sem consentimento de telemedicina. O link de WhatsApp fica bloqueado.</p>
-            )}
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
+              <a className="btn btn-ok" target="_blank" rel="noreferrer" href={waLink(whatsapp, teleMessage(patient))}>
+                <MessageCircle className="size-4" aria-hidden="true" />
+                Avisar teleconsulta
+              </a>
+              <a
+                className="btn btn-ghost"
+                target="_blank"
+                rel="noreferrer"
+                href={waLink(whatsapp, changeMessage(patient, selected.data, selected.hora))}
+              >
+                Avisar alteração
+              </a>
+            </div>
           </div>
         ) : null}
       </section>
@@ -1090,13 +1281,15 @@ function Admin({ setNotice }: { setNotice: (s: string) => void }) {
           onClick={() => {
             resetDemo();
             setEmail("sanderolameda@gmail.com");
-            setWhatsapp("5519993680549");
-            setNotice("Dados de demonstração restaurados.");
+            setWhatsapp(CLINIC_WHATSAPP);
+            setNotice("Pacientes e agenda limpos.");
           }}
         >
-          Restaurar demonstração
+          Limpar pacientes e agenda
         </button>
-        <p className="mt-3 text-sm text-muted">Em produção, e-mail e WhatsApp ficam no servidor do consultório, não no navegador.</p>
+        <p className="mt-3 text-sm text-muted">
+          WhatsApp da clínica: {formatWa(CLINIC_WHATSAPP)}. Os dados ficam neste navegador até ligar o Firebase ao e-mail do profissional.
+        </p>
       </section>
       <section className="panel p-5">
         <p className="text-xs font-semibold tracking-widest text-accent uppercase">Medicamentos</p>

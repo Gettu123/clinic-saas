@@ -26,8 +26,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install -g npm@10.9.9
-      - run: npm ci
+      - run: npm install
       - run: npm run build:pages || test -s .output/public/index.html
       - run: cp .output/public/index.html .output/public/404.html && touch .output/public/.nojekyll
       - uses: actions/upload-pages-artifact@v3

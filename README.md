@@ -6,6 +6,8 @@ Pacientes e consultas são fictícios. A organização de texto não diagnostica
 
 Tenant ativo: CL001 Clínica Azul. E-mail `sanderolameda@gmail.com`. WhatsApp `+55 19 99368-0549`.
 
+Site publicado: https://gettu123.github.io/clinic-saas/
+
 ## Executar
 
 ```bash

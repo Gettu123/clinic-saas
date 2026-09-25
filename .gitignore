@@ -1,5 +1,6 @@
 node_modules
 .vercel
+.output
 .grok
 screenshots
 artifacts
@@ -9,3 +10,4 @@ dist
 .env.*
 *.log
 AGENTS.md
+
